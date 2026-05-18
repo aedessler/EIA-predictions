@@ -72,7 +72,7 @@ ENERGY_TYPES: dict[str, dict] = {
         "api_scenario_prefix": "ref",
         "bulk_col_substr": "GEN_NA_ALLS_NA_WND_NA_NA",
         "bulk_unit_is_energy": False,       # billion kWh
-        "ylim": None,                       # auto-scale from data
+        "ylim": (0, 2500),
         "output_stem": "wind_projections",
         "use_dedicated_actuals": False,
     },
@@ -88,7 +88,7 @@ ENERGY_TYPES: dict[str, dict] = {
         "api_scenario_prefix": "ref",
         "bulk_col_substr": "GEN_NA_ALLS_NA_SLR_NA_NA",
         "bulk_unit_is_energy": False,
-        "ylim": None,
+        "ylim": (0, 2500),
         "output_stem": "solar_projections",
         "use_dedicated_actuals": False,
     },
@@ -221,27 +221,20 @@ def _actuals_from_retro_csv(retro_df: pd.DataFrame, ecfg: dict) -> pd.DataFrame:
 
 def _actuals_from_elec_supplement(energy_key: str) -> pd.DataFrame:
     """
-    Fetch wind/solar generation (all sectors, billion kWh) from EIA APIs to
-    supplement years not yet in the retrospective CSV.
+    Fetch wind/solar generation (all sectors, billion kWh) from EIA APIs.
 
-    Tries in order:
-      1. total-energy API (MER MSN codes) — covers all sectors including
-         distributed solar/wind.
-      2. electricity/electric-power-operational-data — electric power sector
-         only; may undercount distributed solar but better than nothing.
+    Solar: sums SOT5PUS (utility-scale) + SOT7PUS (small-scale/distributed)
+    from the MER total-energy API so the actuals match the AEO projection basis.
+    Wind: tries MER MSN codes; falls back to electricity operational data.
     """
-    # MER MSN codes for net electricity generation (all sectors, billion kWh).
-    # Multiple candidates tried in order; first non-empty result wins.
-    msn_candidates: dict[str, list[str]] = {
-        "wind":  ["WDTCPUS", "WIENPUS", "WDETPUS"],
-        "solar": ["SOETPUS", "SOTCPUS", "SOEGPUS"],
-    }
     fuel_map = {"wind": "WND", "solar": "SUN"}
 
     def _to_billion_kwh(df: pd.DataFrame, unit: str) -> pd.Series:
         ul = unit.lower()
         if "billion kilowatthour" in ul:
             return df["raw"]
+        if "million kilowatthour" in ul:
+            return df["raw"] / 1_000            # million kWh → billion kWh
         if "trillion btu" in ul:
             return df["raw"] * 293.07 / 1000   # trillion BTU → billion kWh
         if "quadrillion btu" in ul:
@@ -252,35 +245,57 @@ def _actuals_from_elec_supplement(energy_key: str) -> pd.DataFrame:
             return df["raw"] / 1_000_000        # MWh → billion kWh
         return pd.Series(dtype=float)           # unknown unit — skip
 
-    # ── Approach 1: total-energy (MER) ────────────────────────────────────────
-    for msn in msn_candidates.get(energy_key, []):
+    def _fetch_mer_msn(msn: str) -> pd.DataFrame:
+        resp = api_get("total-energy/data/", {
+            "frequency": "annual",
+            "data[0]": "value",
+            "facets[msn][]": msn,
+            "sort[0][column]": "period",
+            "sort[0][direction]": "asc",
+            "length": 100,
+        })
+        rows = resp.get("response", {}).get("data", [])
+        if not rows:
+            return pd.DataFrame()
+        df = pd.DataFrame(rows)
+        unit = df["unit"].iloc[0] if "unit" in df.columns else ""
+        df["year"] = pd.to_numeric(df["period"], errors="coerce")
+        df["raw"]  = pd.to_numeric(df["value"],  errors="coerce")
+        df["value"] = _to_billion_kwh(df, unit)
+        result = df[["year", "value"]].dropna()
+        result["year"] = result["year"].astype(int)
+        return result.sort_values("year").reset_index(drop=True)
+
+    # ── Solar: sum utility-scale (SOT5PUS) + small-scale (SOT7PUS) ────────────
+    # EIA's "All Sectors" label on SOETPUS is misleading — it equals SOT5PUS
+    # (utility-scale only). True all-sector = SOT5PUS + SOT7PUS.
+    if energy_key == "solar":
         try:
-            resp = api_get("total-energy/data/", {
-                "frequency": "annual",
-                "data[0]": "value",
-                "facets[msn][]": msn,
-                "sort[0][column]": "period",
-                "sort[0][direction]": "asc",
-                "length": 100,
-            })
-            rows = resp.get("response", {}).get("data", [])
-            if not rows:
-                continue
-            df = pd.DataFrame(rows)
-            unit = df["unit"].iloc[0] if "unit" in df.columns else ""
-            df["year"] = pd.to_numeric(df["period"], errors="coerce")
-            df["raw"]  = pd.to_numeric(df["value"],  errors="coerce")
-            df["value"] = _to_billion_kwh(df, unit)
-            result = df[["year", "value"]].dropna()
-            result["year"] = result["year"].astype(int)
-            if not result.empty:
-                print(f"    MER MSN {msn} ({unit}): {len(result)} rows, "
+            utility_df = _fetch_mer_msn("SOT5PUS")
+            small_df   = _fetch_mer_msn("SOT7PUS")
+            if not utility_df.empty and not small_df.empty:
+                merged = utility_df.merge(small_df, on="year", suffixes=("_u", "_s"))
+                merged["value"] = merged["value_u"] + merged["value_s"]
+                result = merged[["year", "value"]].copy()
+                print(f"    MER SOT5PUS+SOT7PUS (utility+small-scale): {len(result)} rows, "
                       f"latest = {result['value'].iloc[-1]:.1f} billion kWh")
-                return result.sort_values("year").reset_index(drop=True)
+                return result
+        except Exception as exc:
+            print(f"    Solar MER sum failed: {exc}")
+        return pd.DataFrame()
+
+    # ── Wind: MER MSN candidates (all-sector) ─────────────────────────────────
+    for msn in ["WYETPUS", "WYEGPUS"]:
+        try:
+            result = _fetch_mer_msn(msn)
+            if not result.empty:
+                print(f"    MER MSN {msn}: {len(result)} rows, "
+                      f"latest = {result['value'].iloc[-1]:.1f} billion kWh")
+                return result
         except Exception as exc:
             print(f"    MER MSN {msn} failed: {exc}")
 
-    # ── Approach 2: electricity operational data (electric power sector) ───────
+    # ── Wind fallback: electricity operational data ────────────────────────────
     fuel = fuel_map.get(energy_key)
     if not fuel:
         return pd.DataFrame()
@@ -305,8 +320,7 @@ def _actuals_from_elec_supplement(energy_key: str) -> pd.DataFrame:
             unit_col = next((c for c in df.columns if "unit" in c.lower()), "")
             unit = df[unit_col].iloc[0] if unit_col else "thousand megawatthour"
             annual = df.groupby("year")["raw"].sum().reset_index()
-            annual["raw"] = annual["raw"]  # already summed
-            annual["value"] = _to_billion_kwh(annual.rename(columns={"raw": "raw"}), unit)
+            annual["value"] = _to_billion_kwh(annual, unit)
             annual = annual[["year", "value"]].dropna()
             annual["year"] = annual["year"].astype(int)
             if not annual.empty:
@@ -341,8 +355,43 @@ def fetch_actuals(ecfg: dict, retro_df: pd.DataFrame | None,
         except Exception as exc:
             print(f"    MER fallback failed: {exc}")
         return pd.DataFrame(columns=["year", "value"])
+    elif energy_key == "solar":
+        # Solar: the retrospective CSV ACTUAL rows only cover the electric power
+        # sector (utility-scale), but AEO projections are all-sector (utility +
+        # distributed).  Use the MER API as primary source for all years so the
+        # actuals are on the same basis as the projections.
+        result = pd.DataFrame(columns=["year", "value"])
+        print("  Fetching all-sector solar actuals via MER API…")
+        api_df = _actuals_from_elec_supplement(energy_key)
+        if not api_df.empty:
+            result = api_df
+            print(f"  {len(result)} all-sector rows "
+                  f"({int(result['year'].min())}–{int(result['year'].max())}), "
+                  f"latest = {result['value'].iloc[-1]:.1f} billion kWh")
+        else:
+            print("  MER API failed; falling back to retro CSV (utility-scale only).")
+
+        # Backfill any early years missing from the API with retro CSV rows.
+        # Pre-2014 distributed solar was negligible, so retro CSV ≈ all-sector
+        # for those years.
+        if retro_df is not None:
+            retro_result = _actuals_from_retro_csv(retro_df, ecfg)
+            if not retro_result.empty:
+                api_min = int(result["year"].min()) if not result.empty else 9999
+                early = retro_result[retro_result["year"] < api_min]
+                if not early.empty:
+                    print(f"    Prepending {len(early)} early rows from retro CSV "
+                          f"({int(early['year'].min())}–{int(early['year'].max())})")
+                    result = (pd.concat([early, result], ignore_index=True)
+                              .sort_values("year").reset_index(drop=True))
+
+        if result.empty:
+            print("  WARNING: no solar actuals found.")
+        return result
+
     else:
-        # Wind/Solar: retrospective CSV as base, supplement with API for recent years
+        # Wind: retrospective CSV as base, supplement with API for recent years.
+        # Distributed wind is negligible so the retro CSV is effectively all-sector.
         if retro_df is None:
             print("  WARNING: no retrospective CSV for actuals.")
             result = pd.DataFrame(columns=["year", "value"])

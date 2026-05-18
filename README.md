@@ -70,7 +70,9 @@ https://api.eia.gov/v2/total-energy/data/
 ```
 Fallback: EIA Monthly Energy Review Table 1.3 (`https://www.eia.gov/totalenergy/data/browser/csv.php?tbl=T01.03&freq=a`).
 
-**Wind and Solar** — extracted directly from the retrospective CSV's `ACTUAL` rows (same file as the projections). Wind actuals run from ~1983 through 2024; solar from ~2005 through 2024.
+**Wind** — extracted from the retrospective CSV's `ACTUAL` rows (same file as the projections). Distributed wind is negligible, so the retro CSV is effectively all-sector. Wind actuals run from ~1983 through 2024, extended via the EIA MER API (MSN `WYETPUS`, "Electricity Net Generation From Wind, All Sectors") for subsequent years.
+
+**Solar** — the retrospective CSV `ACTUAL` rows cover only the electric power sector (utility-scale), but the AEO projection lines are all-sector (utility + distributed). To keep actuals on the same basis as the projections, solar actuals are fetched from the EIA Monthly Energy Review (MER) API as the primary source, which covers all sectors including small-scale distributed generation. Early years where the API lacks data are backfilled with the retro CSV (pre-2014 distributed solar was negligible, so those rows are effectively all-sector). Solar actuals run from ~2005 through the latest available year.
 
 For manual cross-checking, AEO supplement tables are published at:
 ```
@@ -86,7 +88,7 @@ Relevant tables: Table 2 (Energy Consumption by Sector and Source) and Table 15 
 |-------|--------|------|
 | Coal | Total U.S. coal consumption, all sectors | Quadrillion BTU (quads) |
 | Wind | U.S. wind electricity generation, all sectors | Billion kWh |
-| Solar | U.S. solar electricity generation, all sectors (utility-scale + distributed) | Billion kWh |
+| Solar | U.S. solar electricity generation, all sectors (utility-scale + distributed); actuals = MER `SOT5PUS` + `SOT7PUS` | Billion kWh |
 
 Coal is **consumption**, not production or electricity generation specifically — it includes electric power, industrial, residential/commercial, and coke plant uses.
 
