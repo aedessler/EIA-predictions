@@ -1,8 +1,10 @@
 # EIA Annual Energy Outlook Projections – Coal, Wind & Solar
 
-Compares actual production since the late 2000s to predictions made every year. Each chart overlays one thin colored line per AEO vintage (reference case) against a thick black line of actual historical data, illustrating how EIA's forecasts have evolved over time.
+Compares actuals against predictions made every year. Each chart overlays one thin colored line per AEO vintage (reference case) against a thick black line of actual historical data, illustrating how EIA's forecasts have evolved over time. All three charts share the same y-axis unit (billion kWh).
 
 ![EIA AEO Coal Projections](output/coal_projections.png)
+![EIA AEO Wind Projections](output/wind_projections.png)
+![EIA AEO Solar Projections](output/solar_projections.png)
 
 ---
 
@@ -96,16 +98,19 @@ Coal is **consumption**, not production or electricity generation specifically �
 
 ## Unit Conversions
 
-**Million short tons → quads (coal only)**
+All three charts use **billion kWh** on the y-axis.
+
+**Coal: million short tons → billion kWh** (two-step)
 ```
-1 million short ton × 0.02009 = 1 quadrillion BTU
+million short tons × 0.02009 = quads
+quads × 293.07 = billion kWh
 ```
-Based on EIA's weighted-average heat content for U.S. coal (bituminous, subbituminous, and lignite blend). Calibration: the ~1,100 million short ton peak in 2007 converts to ~22.1 quads, consistent with historical records.
+The 0.02009 factor is EIA's weighted-average heat content for U.S. coal. The 293.07 factor is exact: 1 quad ÷ 3,412.14 BTU/kWh. Calibration: the ~1,100 million short ton peak in 2007 converts to ~6,640 billion kWh.
 Reference: https://www.eia.gov/tools/faqs/faq.php?id=72&t=2
 
-**Trillion Btu → quads**: divide by 1,000 (1 quad = 1 quadrillion Btu = 1,000 trillion Btu).
+When the AEO API returns coal data already in quads (series `CNSM_NA_NA_NA_CL_NA_NA_QBTU`), only the second step is applied.
 
-Wind and solar data are already in billion kWh throughout and require no conversion.
+**Wind and solar** are already in billion kWh from EIA and require no conversion.
 
 ---
 
@@ -115,10 +120,10 @@ Wind and solar data are already in billion kWh throughout and require no convers
 
 **AEO 2026 uses a different scenario name.** EIA restructured AEO 2026 around a "Current Baseline" scenario labeled `CB2026` rather than the traditional `REF2026`. The script detects this automatically. The prior-year reference (`AEO2025REF`), bundled inside the 2026 data for comparison, is excluded.
 
-**Coal sector definitions shifted across vintages.** AEO 2008–2013 may aggregate coal slightly differently (e.g., treatment of coke breeze or coal-to-liquids) compared to later editions. Discrepancies are estimated at less than 1 quad.
+**Coal sector definitions shifted across vintages.** AEO 2008–2013 may aggregate coal slightly differently (e.g., treatment of coke breeze or coal-to-liquids) compared to later editions. Discrepancies are estimated at less than ~300 billion kWh (~1 quad).
 
 **AEO 2020** was a preliminary release delayed by COVID-19 and may show a minor discontinuity relative to adjacent vintages.
 
-**IRA inflection in recent AEO editions.** The Inflation Reduction Act (2022) clean energy incentives are more fully incorporated in AEO 2023 and later, which accounts for the sharp downward revision in coal projections (from ~3.3 quads by 2050 in AEO 2023 to ~0.5 quads in AEO 2025/2026) and correspondingly larger upward revisions in wind and solar projections.
+**IRA inflection in recent AEO editions.** The Inflation Reduction Act (2022) clean energy incentives are more fully incorporated in AEO 2023 and later, which accounts for the sharp downward revision in coal projections (from ~970 billion kWh by 2050 in AEO 2023 to ~150 billion kWh in AEO 2025/2026) and correspondingly larger upward revisions in wind and solar projections.
 
 **Each vintage line starts at its publication year.** Historical data included in each AEO publication is excluded from the projection lines; only forward-looking values are plotted.
