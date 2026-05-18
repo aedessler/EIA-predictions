@@ -33,7 +33,9 @@ OUTPUT_DIR = Path("output")
 AEO_VINTAGES = list(range(2008, 2027))  # 2008–2026 inclusive
 
 # EIA standard heat content: ~20.09 MMBtu/short ton (weighted average all coal types)
-MST_TO_QUAD = 0.02009  # million short tons → quadrillion BTU
+MST_TO_QUAD = 0.02009        # million short tons → quadrillion BTU
+QUADS_TO_BLNKWH = 293.07     # quadrillion BTU → billion kWh  (1 quad / 3412.14 BTU/kWh)
+MST_TO_BLNKWH = MST_TO_QUAD * QUADS_TO_BLNKWH  # million short tons → billion kWh
 
 RETRO_CSV_URL = (
     "https://www.eia.gov/outlooks/aeo/retrospective/csv/dashappdata_allcases.csv"
@@ -45,18 +47,18 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (energy-projections research project)"}
 ENERGY_TYPES: dict[str, dict] = {
     "coal": {
         "title": "U.S. EIA Annual Energy Outlook Projections for Coal",
-        "ylabel": "Coal Consumption (quads)",
+        "ylabel": "Coal Consumption (billion kWh)",
         "retro_col": "CNSM_NA_NA_NA_CL_NA_NA_MILLTON",
-        "retro_multiplier": MST_TO_QUAD,   # million short tons → quads
-        "api_series": [                     # (series_id, multiplier) tried in order
-            ("cnsm_NA_NA_NA_cl_NA_NA_millton", MST_TO_QUAD),
-            ("CNSM_NA_NA_NA_CL_NA_NA_QBTU", 1.0),
-            ("CNSM_NA_NA_NA_CL_NA_NA_MILLTON", MST_TO_QUAD),
+        "retro_multiplier": MST_TO_BLNKWH,  # million short tons → billion kWh
+        "api_series": [                      # (series_id, multiplier) tried in order
+            ("cnsm_NA_NA_NA_cl_NA_NA_millton", MST_TO_BLNKWH),
+            ("CNSM_NA_NA_NA_CL_NA_NA_QBTU", QUADS_TO_BLNKWH),
+            ("CNSM_NA_NA_NA_CL_NA_NA_MILLTON", MST_TO_BLNKWH),
         ],
-        "api_scenario_prefix": "ref",       # ref2024, cb2026, etc.
+        "api_scenario_prefix": "ref",        # ref2024, cb2026, etc.
         "bulk_col_substr": "CNSM_NA_NA_NA_CL_NA_NA",
-        "bulk_unit_is_energy": True,        # detect Quad/MILLTON in bulk ZIP
-        "ylim": (0, 40),
+        "bulk_unit_is_energy": True,         # detect Quad/MILLTON in bulk ZIP
+        "ylim": (0, 10000),
         "output_stem": "coal_projections",
         "use_dedicated_actuals": True,      # fetch actuals from total-energy API
     },
@@ -168,14 +170,14 @@ def _actuals_from_total_energy_api() -> pd.DataFrame:
     df["year"] = pd.to_numeric(df["period"], errors="coerce")
     df["raw"] = pd.to_numeric(df["value"], errors="coerce")
     if "Thousand Short Ton" in unit:
-        df["value"] = df["raw"] * MST_TO_QUAD / 1000
+        df["value"] = df["raw"] * MST_TO_BLNKWH / 1000
     elif "Trillion Btu" in unit:
-        df["value"] = df["raw"] / 1000
+        df["value"] = df["raw"] / 1000 * QUADS_TO_BLNKWH
     elif "Quadrillion Btu" in unit or "Quad Btu" in unit:
-        df["value"] = df["raw"]
+        df["value"] = df["raw"] * QUADS_TO_BLNKWH
     else:
         print(f"    Unknown unit '{unit}', dividing by 1000")
-        df["value"] = df["raw"] / 1000
+        df["value"] = df["raw"] / 1000 * QUADS_TO_BLNKWH
     result = df[["year", "value"]].dropna().sort_values("year").reset_index(drop=True)
     result["year"] = result["year"].astype(int)
     return result
@@ -196,7 +198,10 @@ def _actuals_from_mer_t0103() -> pd.DataFrame:
         sub["year"] = sub["YYYYMM"].astype(str).str[:4].astype(int)
         sub["raw"] = pd.to_numeric(sub["Value"], errors="coerce")
         unit = sub["Unit"].iloc[0] if "Unit" in sub.columns else ""
-        sub["value"] = sub["raw"] / 1000 if "Trillion" in unit else sub["raw"]
+        if "Trillion" in unit:
+            sub["value"] = sub["raw"] / 1000 * QUADS_TO_BLNKWH  # trillion Btu → quads → billion kWh
+        else:
+            sub["value"] = sub["raw"] * QUADS_TO_BLNKWH          # quads → billion kWh
         result = sub[["year", "value"]].dropna().sort_values("year").reset_index(drop=True)
         if not result.empty:
             return result
@@ -343,10 +348,11 @@ def fetch_actuals(ecfg: dict, retro_df: pd.DataFrame | None,
             result = _actuals_from_total_energy_api()
             if not result.empty:
                 peak = result["value"].max()
-                print(f"    {len(result)} rows, peak = {peak:.2f} quads")
-                if 12 < peak < 35:
+                print(f"    {len(result)} rows, peak = {peak:.0f} billion kWh")
+                lo, hi = 12 * QUADS_TO_BLNKWH, 35 * QUADS_TO_BLNKWH
+                if lo < peak < hi:
                     return result
-                print(f"    Peak {peak:.1f} outside expected 12–35, trying MER fallback.")
+                print(f"    Peak {peak:.0f} outside expected {lo:.0f}–{hi:.0f} billion kWh, trying MER fallback.")
         except Exception as exc:
             print(f"    Total Energy API failed: {exc}")
         print("  Trying MER Table 1.3…")
@@ -490,9 +496,9 @@ def _aeo_from_bulk_zip(vintage: int, ecfg: dict) -> pd.DataFrame | None:
         df = pd.DataFrame(pairs, columns=["year", "v"])
         if is_energy:
             if "Quad" in units or "QBTU" in sid.upper():
-                df["value"] = df["v"]
+                df["value"] = df["v"] * QUADS_TO_BLNKWH
             elif "MMst" in units or "MILLTON" in sid.upper() or "Short Ton" in units:
-                df["value"] = df["v"] * mult
+                df["value"] = df["v"] * mult   # mult is now MST_TO_BLNKWH
             else:
                 return None
         else:

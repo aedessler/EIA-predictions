@@ -86,11 +86,11 @@ Relevant tables: Table 2 (Energy Consumption by Sector and Source) and Table 15 
 
 | Chart | Metric | Unit |
 |-------|--------|------|
-| Coal | Total U.S. coal consumption, all sectors | Quadrillion BTU (quads) |
+| Coal | Total U.S. coal consumption, all sectors | Billion kWh (converted from quads via 1 quad = 293.07 billion kWh) |
 | Wind | U.S. wind electricity generation, all sectors | Billion kWh |
 | Solar | U.S. solar electricity generation, all sectors (utility-scale + distributed); actuals = MER `SOT5PUS` + `SOT7PUS` | Billion kWh |
 
-Coal is **consumption**, not production or electricity generation specifically — it includes electric power, industrial, residential/commercial, and coke plant uses.
+Coal is **consumption**, not production or electricity generation specifically — it includes electric power, industrial, residential/commercial, and coke plant uses. Values are converted from EIA's native quads using 1 quad = 293.07 billion kWh (1 quad ÷ 3,412.14 BTU/kWh).
 
 ---
 
