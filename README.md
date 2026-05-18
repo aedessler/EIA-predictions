@@ -2,6 +2,8 @@
 
 Reproduces and extends the RethinkX "EIA AEO Projections for Coal" chart style, updated through AEO 2026, and applies the same treatment to wind and solar. Each chart overlays one thin colored line per AEO vintage (reference case) against a thick black line of actual historical data, illustrating how EIA's forecasts have evolved over time.
 
+![EIA AEO Coal Projections](output/coal_projections.png)
+
 ---
 
 ## Program
