@@ -10,6 +10,11 @@ Compares actual production since the late 2000s to predictions made every year. 
 
 **`coal_chart.py`** — the single script that fetches data, processes it, and writes all three charts.
 
+A free EIA API key is required. Get one at https://www.eia.gov/opendata/ and set it before running:
+```bash
+export EIA_API_KEY=your_key_here
+```
+
 Run with:
 ```bash
 python coal_chart.py

@@ -219,7 +219,108 @@ def _actuals_from_retro_csv(retro_df: pd.DataFrame, ecfg: dict) -> pd.DataFrame:
     return sub[["year", "value"]].sort_values("year").reset_index(drop=True)
 
 
-def fetch_actuals(ecfg: dict, retro_df: pd.DataFrame | None) -> pd.DataFrame:
+def _actuals_from_elec_supplement(energy_key: str) -> pd.DataFrame:
+    """
+    Fetch wind/solar generation (all sectors, billion kWh) from EIA APIs to
+    supplement years not yet in the retrospective CSV.
+
+    Tries in order:
+      1. total-energy API (MER MSN codes) — covers all sectors including
+         distributed solar/wind.
+      2. electricity/electric-power-operational-data — electric power sector
+         only; may undercount distributed solar but better than nothing.
+    """
+    # MER MSN codes for net electricity generation (all sectors, billion kWh).
+    # Multiple candidates tried in order; first non-empty result wins.
+    msn_candidates: dict[str, list[str]] = {
+        "wind":  ["WDTCPUS", "WIENPUS", "WDETPUS"],
+        "solar": ["SOETPUS", "SOTCPUS", "SOEGPUS"],
+    }
+    fuel_map = {"wind": "WND", "solar": "SUN"}
+
+    def _to_billion_kwh(df: pd.DataFrame, unit: str) -> pd.Series:
+        ul = unit.lower()
+        if "billion kilowatthour" in ul:
+            return df["raw"]
+        if "trillion btu" in ul:
+            return df["raw"] * 293.07 / 1000   # trillion BTU → billion kWh
+        if "quadrillion btu" in ul:
+            return df["raw"] * 293_071          # quads → billion kWh
+        if "thousand megawatthour" in ul:
+            return df["raw"] / 1_000            # thousand MWh → billion kWh
+        if "megawatthour" in ul:
+            return df["raw"] / 1_000_000        # MWh → billion kWh
+        return pd.Series(dtype=float)           # unknown unit — skip
+
+    # ── Approach 1: total-energy (MER) ────────────────────────────────────────
+    for msn in msn_candidates.get(energy_key, []):
+        try:
+            resp = api_get("total-energy/data/", {
+                "frequency": "annual",
+                "data[0]": "value",
+                "facets[msn][]": msn,
+                "sort[0][column]": "period",
+                "sort[0][direction]": "asc",
+                "length": 100,
+            })
+            rows = resp.get("response", {}).get("data", [])
+            if not rows:
+                continue
+            df = pd.DataFrame(rows)
+            unit = df["unit"].iloc[0] if "unit" in df.columns else ""
+            df["year"] = pd.to_numeric(df["period"], errors="coerce")
+            df["raw"]  = pd.to_numeric(df["value"],  errors="coerce")
+            df["value"] = _to_billion_kwh(df, unit)
+            result = df[["year", "value"]].dropna()
+            result["year"] = result["year"].astype(int)
+            if not result.empty:
+                print(f"    MER MSN {msn} ({unit}): {len(result)} rows, "
+                      f"latest = {result['value'].iloc[-1]:.1f} billion kWh")
+                return result.sort_values("year").reset_index(drop=True)
+        except Exception as exc:
+            print(f"    MER MSN {msn} failed: {exc}")
+
+    # ── Approach 2: electricity operational data (electric power sector) ───────
+    fuel = fuel_map.get(energy_key)
+    if not fuel:
+        return pd.DataFrame()
+    for sector_id in ("99", "1"):
+        try:
+            resp = api_get("electricity/electric-power-operational-data/data/", {
+                "frequency": "annual",
+                "data[0]": "generation",
+                "facets[fueltypeid][]": fuel,
+                "facets[location][]": "US",
+                "facets[sectorid][]": sector_id,
+                "sort[0][column]": "period",
+                "sort[0][direction]": "asc",
+                "length": 500,
+            })
+            rows = resp.get("response", {}).get("data", [])
+            if not rows:
+                continue
+            df = pd.DataFrame(rows)
+            df["year"] = pd.to_numeric(df["period"].astype(str).str[:4], errors="coerce")
+            df["raw"]  = pd.to_numeric(df["generation"], errors="coerce")
+            unit_col = next((c for c in df.columns if "unit" in c.lower()), "")
+            unit = df[unit_col].iloc[0] if unit_col else "thousand megawatthour"
+            annual = df.groupby("year")["raw"].sum().reset_index()
+            annual["raw"] = annual["raw"]  # already summed
+            annual["value"] = _to_billion_kwh(annual.rename(columns={"raw": "raw"}), unit)
+            annual = annual[["year", "value"]].dropna()
+            annual["year"] = annual["year"].astype(int)
+            if not annual.empty:
+                print(f"    Elec API sectorid={sector_id}: {len(annual)} rows, "
+                      f"latest = {annual['value'].iloc[-1]:.1f} billion kWh")
+                return annual.sort_values("year").reset_index(drop=True)
+        except Exception as exc:
+            print(f"    Elec API sectorid={sector_id} failed: {exc}")
+
+    return pd.DataFrame()
+
+
+def fetch_actuals(ecfg: dict, retro_df: pd.DataFrame | None,
+                  energy_key: str = "") -> pd.DataFrame:
     """Fetch historical actuals for the given energy type."""
     if ecfg["use_dedicated_actuals"]:
         # Coal: use total energy API → MER fallback
@@ -241,15 +342,33 @@ def fetch_actuals(ecfg: dict, retro_df: pd.DataFrame | None) -> pd.DataFrame:
             print(f"    MER fallback failed: {exc}")
         return pd.DataFrame(columns=["year", "value"])
     else:
-        # Wind/Solar: use retrospective CSV ACTUAL rows
+        # Wind/Solar: retrospective CSV as base, supplement with API for recent years
         if retro_df is None:
             print("  WARNING: no retrospective CSV for actuals.")
-            return pd.DataFrame(columns=["year", "value"])
-        result = _actuals_from_retro_csv(retro_df, ecfg)
-        if not result.empty:
-            print(f"  {len(result)} actual rows from retrospective CSV "
-                  f"({int(result['year'].min())}–{int(result['year'].max())}), "
-                  f"latest = {result['value'].iloc[-1]:.1f} billion kWh")
+            result = pd.DataFrame(columns=["year", "value"])
+        else:
+            result = _actuals_from_retro_csv(retro_df, ecfg)
+            if not result.empty:
+                print(f"  {len(result)} actual rows from retrospective CSV "
+                      f"({int(result['year'].min())}–{int(result['year'].max())}), "
+                      f"latest = {result['value'].iloc[-1]:.1f} billion kWh")
+
+        # Extend with API data for years beyond the retrospective CSV
+        if energy_key:
+            print(f"  Checking for {energy_key} actuals beyond retrospective CSV…")
+            api_df = _actuals_from_elec_supplement(energy_key)
+            if not api_df.empty:
+                retro_max = int(result["year"].max()) if not result.empty else 0
+                supplement = api_df[api_df["year"] > retro_max]
+                if not supplement.empty:
+                    print(f"    Appending {len(supplement)} newer row(s) "
+                          f"({int(supplement['year'].min())}–"
+                          f"{int(supplement['year'].max())})")
+                    result = (pd.concat([result, supplement], ignore_index=True)
+                              .sort_values("year").reset_index(drop=True))
+                else:
+                    print(f"    No data beyond {retro_max} found via API.")
+
         return result
 
 
@@ -629,7 +748,7 @@ def main() -> None:
         print(f"{'═'*55}")
 
         print(f"\n[1] Actuals…")
-        actuals = fetch_actuals(ecfg, retro_df)
+        actuals = fetch_actuals(ecfg, retro_df, energy_key)
 
         print(f"\n[2] AEO projections…")
         projections = fetch_projections(retro_df, ecfg)
