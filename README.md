@@ -5,20 +5,17 @@ Compares actuals against predictions made every year. Each chart overlays one th
 ![EIA AEO Coal Projections](output/coal_projections.png)
 ![EIA AEO Wind Projections](output/wind_projections.png)
 ![EIA AEO Solar Projections](output/solar_projections.png)
+![EIA AEO Coal Projection Slope](output/coal_slope.png)
 
 ---
 
-## Program
+## Scripts
 
-**`coal_chart.py`** — the single script that fetches data, processes it, and writes all three charts.
+**`coal_chart.py`** — fetches data, processes it, and writes the three projection charts.
 
 A free EIA API key is required. Get one at https://www.eia.gov/opendata/ and set it before running:
 ```bash
 export EIA_API_KEY=your_key_here
-```
-
-Run with:
-```bash
 python coal_chart.py
 ```
 
@@ -30,6 +27,18 @@ Output PNGs (300 DPI) are written to `output/`:
 Downloaded data is cached in `cache/` and reused on subsequent runs. To force a re-download, delete the relevant file from `cache/`.
 
 The script is parameterized by an `ENERGY_TYPES` dict near the top of the file. Adding a new energy series requires only a new entry in that dict with the appropriate EIA column name and API series ID.
+
+---
+
+**`coal_slope.py`** — reads the cached retrospective CSV (no API key needed after `coal_chart.py` has run once) and plots the **near-term slope** of each AEO vintage's coal projection vs. the vintage year. The slope is the linear-regression coefficient (billion kWh/year) fitted over the first 10 projected years of each vintage's reference case.
+
+```bash
+python coal_slope.py
+```
+
+Output: `output/coal_slope.png`
+
+The chart shows that early AEO editions (2008–2015) expected coal consumption to keep rising, the outlook flipped to negative around 2015–2016 (coinciding with the Paris Agreement and accelerating U.S. coal retirements), and recent editions project increasingly steep declines.
 
 ---
 
