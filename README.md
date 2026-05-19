@@ -24,6 +24,7 @@ Output PNGs (300 DPI) are written to `output/`:
 - `output/nuclear_projections.png`
 - `output/gas_projections.png`
 - `output/coal_gas_projections.png`
+- `output/solar_wind_projections.png`
 
 Downloaded data is cached in `cache/` and reused on subsequent runs. To force a re-download, delete the relevant file from `cache/`.
 
@@ -105,6 +106,7 @@ All charts use **billion kWh** on the y-axis and cover **AEO vintages 2008–202
 | Nuclear | Electricity generation from nuclear | Electric power sector |
 | Natural Gas | Electricity generation from natural gas | Electric power sector |
 | Coal + Natural Gas | Sum of coal and natural gas electricity generation | Electric power sector |
+| Solar + Wind | Sum of solar and wind electricity generation | All sectors |
 
 Wind and solar use "all sectors" because AEO projections for those fuels include distributed/behind-the-meter generation. Coal, natural gas, and nuclear are reported on an electric power sector basis, consistent with the AEO projection series (`GEN_NA_ELEP_TGE_*`).
 

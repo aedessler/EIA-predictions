@@ -885,6 +885,31 @@ def main() -> None:
         print(f"\n[3] Generating chart…")
         build_chart(combined_proj, combined_act, combined_ecfg)
 
+    # ── Combined solar + wind chart ────────────────────────────────────────────
+    if "solar" in results and "wind" in results:
+        print(f"\n{'═'*55}")
+        print(f"  SOLAR + WIND (COMBINED)")
+        print(f"{'═'*55}")
+
+        solar_proj, solar_act = results["solar"]
+        wind_proj,  wind_act  = results["wind"]
+
+        combined_proj = {
+            v: _sum_dfs(solar_proj[v], wind_proj[v])
+            for v in set(solar_proj) & set(wind_proj)
+        }
+        combined_act = _sum_dfs(solar_act, wind_act)
+
+        combined_ecfg = {
+            "title": "U.S. EIA Annual Energy Outlook Projections for Solar + Wind",
+            "ylabel": "Solar + Wind (billion kWh)",
+            "ylim": None,
+            "output_stem": "solar_wind_projections",
+        }
+        validate(combined_proj, combined_act, "solar+wind")
+        print(f"\n[3] Generating chart…")
+        build_chart(combined_proj, combined_act, combined_ecfg)
+
     print("\n═══ Done. Outputs in:", OUTPUT_DIR, "═══")
 
 
