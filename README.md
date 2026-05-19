@@ -25,6 +25,7 @@ Output PNGs (300 DPI) are written to `output/`:
 - `output/solar_projections.png`
 - `output/nuclear_projections.png`
 - `output/gas_projections.png`
+- `output/coal_gas_projections.png`
 
 Downloaded data is cached in `cache/` and reused on subsequent runs. To force a re-download, delete the relevant file from `cache/`.
 

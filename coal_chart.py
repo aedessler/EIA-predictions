@@ -830,6 +830,8 @@ def main() -> None:
     except Exception as exc:
         print(f"  Retrospective CSV failed: {exc}")
 
+    results: dict[str, tuple] = {}  # {energy_key: (projections, actuals)}
+
     for energy_key, ecfg in ENERGY_TYPES.items():
         print(f"\n{'═'*55}")
         print(f"  {energy_key.upper()} PROJECTIONS")
@@ -847,8 +849,42 @@ def main() -> None:
             print(f"  ERROR: No projection data — skipping {energy_key} chart.")
             continue
 
+        results[energy_key] = (projections, actuals)
+
         print(f"\n[3] Generating chart…")
         build_chart(projections, actuals, ecfg)
+
+    # ── Combined coal + natural gas chart ──────────────────────────────────────
+    if "coal" in results and "gas" in results:
+        print(f"\n{'═'*55}")
+        print(f"  COAL + NATURAL GAS (COMBINED)")
+        print(f"{'═'*55}")
+
+        coal_proj, coal_act = results["coal"]
+        gas_proj,  gas_act  = results["gas"]
+
+        def _sum_dfs(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:
+            m = (a.set_index("year")[["value"]]
+                  .join(b.set_index("year")[["value"]], lsuffix="_a", rsuffix="_b")
+                  .dropna())
+            m["value"] = m["value_a"] + m["value_b"]
+            return m[["value"]].reset_index()
+
+        combined_proj = {
+            v: _sum_dfs(coal_proj[v], gas_proj[v])
+            for v in set(coal_proj) & set(gas_proj)
+        }
+        combined_act = _sum_dfs(coal_act, gas_act)
+
+        combined_ecfg = {
+            "title": "U.S. EIA Annual Energy Outlook Projections for Coal + Natural Gas",
+            "ylabel": "Coal + Natural Gas (billion kWh)",
+            "ylim": None,
+            "output_stem": "coal_gas_projections",
+        }
+        validate(combined_proj, combined_act, "coal+gas")
+        print(f"\n[3] Generating chart…")
+        build_chart(combined_proj, combined_act, combined_ecfg)
 
     print("\n═══ Done. Outputs in:", OUTPUT_DIR, "═══")
 
