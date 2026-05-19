@@ -46,21 +46,20 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (energy-projections research project)"}
 
 ENERGY_TYPES: dict[str, dict] = {
     "coal": {
-        "title": "U.S. EIA Annual Energy Outlook Projections for Coal",
-        "ylabel": "Coal Consumption (billion kWh)",
-        "retro_col": "CNSM_NA_NA_NA_CL_NA_NA_MILLTON",
-        "retro_multiplier": MST_TO_BLNKWH,  # million short tons → billion kWh
-        "api_series": [                      # (series_id, multiplier) tried in order
-            ("cnsm_NA_NA_NA_cl_NA_NA_millton", MST_TO_BLNKWH),
-            ("CNSM_NA_NA_NA_CL_NA_NA_QBTU", QUADS_TO_BLNKWH),
-            ("CNSM_NA_NA_NA_CL_NA_NA_MILLTON", MST_TO_BLNKWH),
+        "title": "U.S. EIA Annual Energy Outlook Projections for Coal (Electricity)",
+        "ylabel": "Coal Electricity Generation (billion kWh)",
+        "retro_col": "GEN_NA_ELEP_TGE_CL_NA_USA_BLNKWH",
+        "retro_multiplier": 1.0,            # already in billion kWh
+        "api_series": [
+            ("gen_NA_elep_tge_cl_NA_usa_blnkwh", 1.0),
+            ("GEN_NA_ELEP_TGE_CL_NA_USA_BLNKWH", 1.0),
         ],
-        "api_scenario_prefix": "ref",        # ref2024, cb2026, etc.
-        "bulk_col_substr": "CNSM_NA_NA_NA_CL_NA_NA",
-        "bulk_unit_is_energy": True,         # detect Quad/MILLTON in bulk ZIP
-        "ylim": (0, 10000),
+        "api_scenario_prefix": "ref",
+        "bulk_col_substr": "GEN_NA_ELEP_TGE_CL_NA_USA",
+        "bulk_unit_is_energy": False,
+        "ylim": None,
         "output_stem": "coal_projections",
-        "use_dedicated_actuals": True,      # fetch actuals from total-energy API
+        "use_dedicated_actuals": False,
     },
     "wind": {
         "title": "U.S. EIA Annual Energy Outlook Projections for Wind",
@@ -264,7 +263,7 @@ def _actuals_from_elec_supplement(energy_key: str) -> pd.DataFrame:
     from the MER total-energy API so the actuals match the AEO projection basis.
     Wind: tries MER MSN codes; falls back to electricity operational data.
     """
-    fuel_map = {"wind": "WND", "solar": "SUN", "nuclear": "NUC", "gas": "NG"}
+    fuel_map = {"coal": "COL", "wind": "WND", "solar": "SUN", "nuclear": "NUC", "gas": "NG"}
 
     def _to_billion_kwh(df: pd.DataFrame, unit: str) -> pd.Series:
         ul = unit.lower()
