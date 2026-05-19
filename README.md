@@ -23,6 +23,8 @@ Output PNGs (300 DPI) are written to `output/`:
 - `output/coal_projections.png`
 - `output/wind_projections.png`
 - `output/solar_projections.png`
+- `output/nuclear_projections.png`
+- `output/gas_projections.png`
 
 Downloaded data is cached in `cache/` and reused on subsequent runs. To force a re-download, delete the relevant file from `cache/`.
 
@@ -97,11 +99,15 @@ Relevant tables: Table 2 (Energy Consumption by Sector and Source) and Table 15 
 
 | Chart | Metric | Unit |
 |-------|--------|------|
-| Coal | Total U.S. coal consumption, all sectors | Billion kWh (converted from quads via 1 quad = 293.07 billion kWh) |
+| Coal | Total U.S. coal consumption, all sectors | Billion kWh (converted from quads) |
 | Wind | U.S. wind electricity generation, all sectors | Billion kWh |
 | Solar | U.S. solar electricity generation, all sectors (utility-scale + distributed); actuals = MER `SOT5PUS` + `SOT7PUS` | Billion kWh |
+| Nuclear | U.S. nuclear electricity generation, electric power sector | Billion kWh |
+| Natural Gas | U.S. natural gas electricity generation, electric power sector | Billion kWh |
 
 Coal is **consumption**, not production or electricity generation specifically — it includes electric power, industrial, residential/commercial, and coke plant uses. Values are converted from EIA's native quads using 1 quad = 293.07 billion kWh (1 quad ÷ 3,412.14 BTU/kWh).
+
+Nuclear and natural gas cover the **electric power sector only** (utilities + independent power producers). Industrial co-generation and other behind-the-meter uses are excluded, consistent with the AEO projection series used (`GEN_NA_ELEP_TGE_*`).
 
 ---
 

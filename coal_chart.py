@@ -94,6 +94,38 @@ ENERGY_TYPES: dict[str, dict] = {
         "output_stem": "solar_projections",
         "use_dedicated_actuals": False,
     },
+    "nuclear": {
+        "title": "U.S. EIA Annual Energy Outlook Projections for Nuclear",
+        "ylabel": "Nuclear Generation (billion kWh)",
+        "retro_col": "GEN_NA_ELEP_TGE_NUP_NA_USA_BLNKWH",
+        "retro_multiplier": 1.0,
+        "api_series": [
+            ("gen_NA_elep_tge_nup_NA_usa_blnkwh", 1.0),
+            ("GEN_NA_ELEP_TGE_NUP_NA_USA_BLNKWH", 1.0),
+        ],
+        "api_scenario_prefix": "ref",
+        "bulk_col_substr": "GEN_NA_ELEP_TGE_NUP_NA_USA",
+        "bulk_unit_is_energy": False,
+        "ylim": None,
+        "output_stem": "nuclear_projections",
+        "use_dedicated_actuals": False,
+    },
+    "gas": {
+        "title": "U.S. EIA Annual Energy Outlook Projections for Natural Gas",
+        "ylabel": "Natural Gas Generation (billion kWh)",
+        "retro_col": "GEN_NA_ELEP_TGE_NG_NA_USA_BLNKWH",
+        "retro_multiplier": 1.0,
+        "api_series": [
+            ("gen_NA_elep_tge_ng_NA_usa_blnkwh", 1.0),
+            ("GEN_NA_ELEP_TGE_NG_NA_USA_BLNKWH", 1.0),
+        ],
+        "api_scenario_prefix": "ref",
+        "bulk_col_substr": "GEN_NA_ELEP_TGE_NG_NA_USA",
+        "bulk_unit_is_energy": False,
+        "ylim": None,
+        "output_stem": "gas_projections",
+        "use_dedicated_actuals": False,
+    },
 }
 
 # ── Utilities ──────────────────────────────────────────────────────────────────
@@ -232,7 +264,7 @@ def _actuals_from_elec_supplement(energy_key: str) -> pd.DataFrame:
     from the MER total-energy API so the actuals match the AEO projection basis.
     Wind: tries MER MSN codes; falls back to electricity operational data.
     """
-    fuel_map = {"wind": "WND", "solar": "SUN"}
+    fuel_map = {"wind": "WND", "solar": "SUN", "nuclear": "NUC", "gas": "NG"}
 
     def _to_billion_kwh(df: pd.DataFrame, unit: str) -> pd.Series:
         ul = unit.lower()
@@ -290,17 +322,18 @@ def _actuals_from_elec_supplement(energy_key: str) -> pd.DataFrame:
         return pd.DataFrame()
 
     # ── Wind: MER MSN candidates (all-sector) ─────────────────────────────────
-    for msn in ["WYETPUS", "WYEGPUS"]:
-        try:
-            result = _fetch_mer_msn(msn)
-            if not result.empty:
-                print(f"    MER MSN {msn}: {len(result)} rows, "
-                      f"latest = {result['value'].iloc[-1]:.1f} billion kWh")
-                return result
-        except Exception as exc:
-            print(f"    MER MSN {msn} failed: {exc}")
+    if energy_key == "wind":
+        for msn in ["WYETPUS", "WYEGPUS"]:
+            try:
+                result = _fetch_mer_msn(msn)
+                if not result.empty:
+                    print(f"    MER MSN {msn}: {len(result)} rows, "
+                          f"latest = {result['value'].iloc[-1]:.1f} billion kWh")
+                    return result
+            except Exception as exc:
+                print(f"    MER MSN {msn} failed: {exc}")
 
-    # ── Wind fallback: electricity operational data ────────────────────────────
+    # ── Electricity operational data (wind fallback; nuclear & gas primary) ───
     fuel = fuel_map.get(energy_key)
     if not fuel:
         return pd.DataFrame()
