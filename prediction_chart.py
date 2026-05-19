@@ -695,7 +695,7 @@ def build_chart(
     ax.set_axisbelow(True)
     for sp in ax.spines.values():
         sp.set_visible(False)
-    ax.tick_params(length=0, labelsize=9)
+    ax.tick_params(length=0, labelsize=12)
 
     # Determine y-axis limits before drawing
     ylim = ecfg["ylim"]
@@ -764,9 +764,9 @@ def build_chart(
             break
     ax.set_yticks(np.arange(ylim[0], ylim[1] + y_step * 0.5, y_step))
 
-    ax.set_xlabel("Year", fontsize=10.5, labelpad=8, fontfamily="DejaVu Sans")
-    ax.set_ylabel(ecfg["ylabel"], fontsize=10.5, labelpad=8, fontfamily="DejaVu Sans")
-    ax.set_title(ecfg["title"], fontsize=14.5, fontweight="bold",
+    ax.set_xlabel("Year", fontsize=13, labelpad=8, fontfamily="DejaVu Sans")
+    ax.set_ylabel(ecfg["ylabel"], fontsize=13, labelpad=8, fontfamily="DejaVu Sans")
+    ax.set_title(ecfg["title"], fontsize=16, fontweight="bold",
                  fontfamily="DejaVu Sans", pad=14)
 
     latest_vintage = max(projections.keys()) if projections else 2026
