@@ -2,13 +2,8 @@
 
 Compares actual electricity generation against EIA Annual Energy Outlook (AEO) predictions made each year. Each chart overlays one thin colored line per AEO vintage (reference case) against a thick black line of actual historical data, illustrating how EIA's forecasts have evolved over time. All charts share the same y-axis unit (billion kWh).
 
+An example of the plots we create:  
 ![EIA AEO Coal Projections](output/coal_projections.png)
-![EIA AEO Wind Projections](output/wind_projections.png)
-![EIA AEO Solar Projections](output/solar_projections.png)
-![EIA AEO Nuclear Projections](output/nuclear_projections.png)
-![EIA AEO Natural Gas Projections](output/gas_projections.png)
-![EIA AEO Coal + Natural Gas Projections](output/coal_gas_projections.png)
-![EIA AEO Coal Projection Slope](output/coal_slope.png)
 
 ---
 
