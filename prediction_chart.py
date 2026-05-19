@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-U.S. EIA Annual Energy Outlook – Coal, Wind & Solar Projections Charts
+U.S. EIA Annual Energy Outlook – Electricity by Fuel Projections Charts
 Uses AEO 2008–2026 vintage reference-case projections vs. actual historical data.
 
-Run: python coal_chart.py
-Outputs: output/{coal,wind,solar}_projections.{png,svg,pdf}
+Run: python prediction_chart.py
+Outputs: output/{coal,wind,solar,nuclear,gas,coal_gas}_projections.png
 """
 
 import io
