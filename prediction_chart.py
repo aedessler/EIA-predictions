@@ -29,7 +29,7 @@ import requests
 
 EIA_API_KEY = os.environ.get("EIA_API_KEY", "put your key here")
 CACHE_DIR = Path("cache")
-OUTPUT_DIR = Path("output")
+OUTPUT_DIR = Path("output/generation")
 AEO_VINTAGES = list(range(2008, 2027))  # 2008–2026 inclusive
 
 # EIA standard heat content: ~20.09 MMBtu/short ton (weighted average all coal types)

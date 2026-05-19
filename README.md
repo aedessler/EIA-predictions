@@ -1,15 +1,17 @@
-# EIA Annual Energy Outlook Projections – Electricity by Fuel
+# EIA Annual Energy Outlook Projections
 
-Compares actual electricity generation against EIA Annual Energy Outlook (AEO) predictions made each year. Each chart overlays one thin colored line per AEO vintage (reference case) against a thick black line of actual historical data, illustrating how EIA's forecasts have evolved over time. All charts share the same y-axis unit (billion kWh).
+Compares actual energy data against EIA Annual Energy Outlook (AEO) predictions made each year. Each chart overlays one thin colored line per AEO vintage (reference case) against a thick black line of actual historical data, illustrating how EIA's forecasts have evolved over time.
 
 An example of the plots we create:  
-![EIA AEO Coal Projections](output/coal_projections.png)
+![EIA AEO Coal Projections](output/generation/coal_projections.png)
 
 ---
 
 ## Scripts
 
-**`prediction_chart.py`** — fetches data, processes it, and writes all six projection charts.
+### `prediction_chart.py` — Electricity Generation
+
+Generates spaghetti-plot charts of AEO electricity generation projections (billion kWh) vs. actuals for coal, natural gas, solar, wind, and nuclear.
 
 A free EIA API key is required. Get one at https://www.eia.gov/opendata/ and set it before running:
 ```bash
@@ -17,109 +19,106 @@ export EIA_API_KEY=your_key_here
 python prediction_chart.py
 ```
 
-Output PNGs (300 DPI) are written to `output/`:
-- `output/coal_projections.png`
-- `output/wind_projections.png`
-- `output/solar_projections.png`
-- `output/nuclear_projections.png`
-- `output/gas_projections.png`
-- `output/coal_gas_projections.png`
-- `output/solar_wind_projections.png`
-
-Downloaded data is cached in `cache/` and reused on subsequent runs. To force a re-download, delete the relevant file from `cache/`.
-
-The script is parameterized by an `ENERGY_TYPES` dict near the top of the file. Adding a new energy series requires only a new entry in that dict with the appropriate EIA column name and API series ID.
+Output PNGs (300 DPI) are written to `output/generation/`:
+- `coal_projections.png`
+- `gas_projections.png`
+- `solar_projections.png`
+- `wind_projections.png`
+- `nuclear_projections.png`
+- `coal_gas_projections.png` (combined)
+- `solar_wind_projections.png` (combined)
 
 ---
 
-**`coal_slope.py`** — reads the cached retrospective CSV (no API key needed after `prediction_chart.py` has run once) and plots the **near-term slope** of each AEO vintage's coal projection vs. the vintage year. The slope is the linear-regression coefficient (billion kWh/year) fitted over the first 10 projected years of each vintage's reference case.
+### `price_chart.py` — Thermal Fuel Prices
+
+Generates spaghetti-plot charts of AEO thermal fuel price projections vs. actual historical prices for four fuels delivered to the electric power sector.
 
 ```bash
-python coal_slope.py
+export EIA_API_KEY=your_key_here
+python price_chart.py
 ```
 
-Output: `output/coal_slope.png`
+Output PNGs (300 DPI) are written to `output/prices/`:
+- `gas_price_projections.png` — natural gas to electric power (real $/Mcf)
+- `coal_price_projections.png` — steam coal to electric power (real $/MMBtu)
+- `crude_oil_price_projections.png` — crude oil import price (real $/barrel)
+- `nuclear_fuel_price_projections.png` — nuclear fuel to electric power ($/MMBtu)
 
-The chart shows that early AEO editions (2008–2015) expected coal generation to keep rising, the outlook flipped to negative around 2015–2016 (coinciding with the Paris Agreement and accelerating U.S. coal retirements), and recent editions project increasingly steep declines.
+---
+
+### `price_chart2.py` — LCOE History (Lazard + NREL ATB)
+
+Generates LCOE history charts for all major generation technologies using Lazard's annual LCOE Analysis (v1.0–v18.0, 2008–2025). For four technologies (solar PV, onshore wind, nuclear, offshore wind), NREL Annual Technology Baseline (2019–2024) projection lines are overlaid.
+
+No API key required.
+
+```bash
+python price_chart2.py
+```
+
+Output PNGs (300 DPI) are written to `output/prices2/`:
+- `solar_pv_lcoe_lazard.png`
+- `onshore_wind_lcoe_lazard.png`
+- `offshore_wind_lcoe_lazard.png`
+- `nuclear_lcoe_lazard.png`
+- `gas_cc_lcoe_lazard.png`
+- `coal_lcoe_lazard.png`
+- `gas_peaker_lcoe_lazard.png`
+- `all_technologies_lcoe_lazard.png` (combined midpoints)
 
 ---
 
 ## Data Sources
 
-### AEO Vintage Projections
+### AEO Vintage Projections (generation & prices)
 
-All energy types draw vintage projections from the same primary source, with fallbacks for any missing vintages.
+All generation and price charts draw vintage projections from the same tiered sources.
 
 **Primary — EIA AEO Retrospective CSV**
 ```
 https://www.eia.gov/outlooks/aeo/retrospective/csv/dashappdata_allcases.csv
 ```
-A single CSV maintained by EIA that contains reference-case projections from every AEO edition alongside actual historical values. It covers AEO vintages from roughly 2005 onward. One download provides projections for all energy types across most vintages.
-
-Relevant columns:
-| Column | Description |
-|--------|-------------|
-| `GEN_NA_ELEP_TGE_CL_NA_USA_BLNKWH` | Coal electricity generation, electric power sector (billion kWh) |
-| `GEN_NA_ALLS_NA_WND_NA_NA_BLNKWH` | Wind electricity generation, all sectors (billion kWh) |
-| `GEN_NA_ALLS_NA_SLR_NA_NA_BLNKWH` | Solar electricity generation, all sectors (billion kWh) |
-| `GEN_NA_ELEP_TGE_NUP_NA_USA_BLNKWH` | Nuclear electricity generation, electric power sector (billion kWh) |
-| `GEN_NA_ELEP_TGE_NG_NA_USA_BLNKWH` | Natural gas electricity generation, electric power sector (billion kWh) |
+A single CSV maintained by EIA containing reference-case projections from every AEO edition alongside actual historical values. Covers AEO vintages from roughly 2005 onward.
 
 **Fallback — EIA API v2**
 ```
 https://api.eia.gov/v2/aeo/{vintage_year}/data/
 ```
-Used for any vintage missing from the retrospective CSV. Scenario facet is `ref{year}` for most vintages; AEO 2026 uses `cb2026` ("Current Baseline 2026"). Requires `EIA_API_KEY`.
+Used for vintages missing from the retrospective CSV. Requires `EIA_API_KEY`.
 
 **Tertiary fallback — EIA bulk ZIP files**
 ```
 https://www.eia.gov/opendata/bulk/AEO{year}.zip
 ```
-Newline-delimited JSON bundles available for most vintages. No API key required.
+Newline-delimited JSON bundles; no API key required. Nuclear fuel price projections use this source primarily, as the retrospective CSV does not include nuclear fuel price series.
 
-### Historical Actuals
+### LCOE Sources (`price_chart2.py`)
 
-All actuals are sourced from the retrospective CSV's `ACTUAL` rows as the primary source, supplemented by EIA API calls for years more recent than the CSV covers.
-
-**Coal, Nuclear, Natural Gas** — retrospective CSV actuals, extended to the latest available year via the EIA electricity generation API (`/v2/electricity/electric-power-operational-data/`), fuel type codes `COL`, `NUC`, and `NG` respectively.
-
-**Wind** — retrospective CSV actuals (effectively all-sector, since distributed wind is negligible), extended via the EIA MER API (MSN `WYETPUS`, "Electricity Net Generation From Wind, All Sectors").
-
-**Solar** — the retrospective CSV `ACTUAL` rows cover only the electric power sector (utility-scale), but the AEO projection lines are all-sector (utility + distributed). Solar actuals are therefore fetched from the EIA MER API as the primary source, summing utility-scale (`SOT5PUS`) and small-scale distributed (`SOT7PUS`) generation. Early years where the MER API lacks data are backfilled with the retro CSV (pre-2014 distributed solar was negligible).
-
-For manual cross-checking, AEO supplement tables are published at:
+**Lazard LCOE Analysis** (v1.0–v17.0 via DataHub; v18.0 hard-coded)
 ```
-https://www.eia.gov/outlooks/aeo/tables_ref.php
+https://datahub.io/climate-and-environment/lazard-levelized-cost-of-energy/_r/-/data/lcoe.csv
 ```
+Annual unsubsidized LCOE low/high ranges for 7 technologies, 2008–2025. Note: v1–v5 (2008–2011) reported subsidized LCOE; v6+ (2012 onward) unsubsidized.
 
----
-
-## Metrics
-
-All charts use **billion kWh** on the y-axis and cover **AEO vintages 2008–2026** (2024 absent; see Caveats). No unit conversion is required — all EIA series are already in billion kWh.
-
-| Chart | Metric | Sector |
-|-------|--------|--------|
-| Coal | Electricity generation from coal | Electric power sector |
-| Wind | Electricity generation from wind | All sectors |
-| Solar | Electricity generation from solar (utility + distributed) | All sectors |
-| Nuclear | Electricity generation from nuclear | Electric power sector |
-| Natural Gas | Electricity generation from natural gas | Electric power sector |
-| Coal + Natural Gas | Sum of coal and natural gas electricity generation | Electric power sector |
-| Solar + Wind | Sum of solar and wind electricity generation | All sectors |
-
-Wind and solar use "all sectors" because AEO projections for those fuels include distributed/behind-the-meter generation. Coal, natural gas, and nuclear are reported on an electric power sector basis, consistent with the AEO projection series (`GEN_NA_ELEP_TGE_*`).
+**NREL Annual Technology Baseline (ATB)**
+```
+https://oedi-data-lake.s3.amazonaws.com/ATB/electricity/csv/{year}/ATBe.csv
+```
+Multi-year LCOE projections from 6 ATB vintages (2019–2024), Moderate scenario, 30-year cost recovery period, no tax credit, R&D case. Overlaid on four Lazard charts where ATB technology coverage aligns.
 
 ---
 
 ## Caveats
 
-**AEO 2024 is unavailable.** EIA's API v2, retrospective CSV, and bulk file archive all skip from 2023 to 2025. No data for AEO 2024 was found through any EIA channel, consistent with reports of reduced EIA output capacity that year. All charts cover AEO 2008–2023 and 2025–2026, with 2024 explicitly absent.
+**AEO 2024 is unavailable.** EIA's API, retrospective CSV, and bulk ZIP archive all skip from 2023 to 2025. All generation and price charts cover AEO 2008–2023 and 2025–2026, with 2024 explicitly absent.
 
-**AEO 2026 uses a different scenario name.** EIA restructured AEO 2026 around a "Current Baseline" scenario labeled `CB2026` rather than the traditional `REF2026`. The script detects this automatically. The prior-year reference (`AEO2025REF`), bundled inside the 2026 data for comparison, is excluded.
+**AEO 2026 uses a different scenario name.** EIA restructured AEO 2026 around a "Current Baseline" scenario labeled `CB2026` rather than the traditional `REF2026`. The scripts detect this automatically.
 
-**AEO 2020** was a preliminary release delayed by COVID-19 and may show a minor discontinuity relative to adjacent vintages.
+**Nuclear fuel price actuals are unavailable.** EIA's machine-readable APIs do not return national-level nuclear fuel cost data; the nuclear fuel price chart shows projections only.
 
-**IRA inflection in recent AEO editions.** The Inflation Reduction Act (2022) clean energy incentives are more fully incorporated in AEO 2023 and later, which accounts for the sharp downward revision in coal projections and correspondingly larger upward revisions in wind and solar projections.
+**Nuclear fuel price projections available only from AEO 2017 onward.** Bulk ZIP files for AEO 2008–2013 return 404; AEO 2014–2016 ZIPs do not contain the nuclear fuel price series.
 
-**Each vintage line starts at its publication year.** Historical data included in each AEO publication is excluded from the projection lines; only forward-looking values are plotted.
+**Each vintage projection line starts at its publication year.** Historical data included in each AEO publication is excluded from the projection lines; only forward-looking values are plotted.
+
+**IRA inflection in recent AEO editions.** The Inflation Reduction Act (2022) clean energy incentives are more fully incorporated in AEO 2023 and later, driving sharp revisions in renewable and fossil fuel projections.
