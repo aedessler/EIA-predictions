@@ -34,11 +34,6 @@ Output PNGs (300 DPI) are written to `output/generation/`:
 
 Generates spaghetti-plot charts of AEO thermal fuel price projections vs. actual historical prices for four fuels delivered to the electric power sector.
 
-```bash
-export EIA_API_KEY=your_key_here
-python price_chart.py
-```
-
 Output PNGs (300 DPI) are written to `output/prices/`:
 - `gas_price_projections.png` — natural gas to electric power (real $/Mcf)
 - `coal_price_projections.png` — steam coal to electric power (real $/MMBtu)
@@ -50,8 +45,6 @@ Output PNGs (300 DPI) are written to `output/prices/`:
 ### `price_chart2.py` — LCOE History (Lazard + NREL ATB)
 
 Generates LCOE history charts for all major generation technologies using Lazard's annual LCOE Analysis (v1.0–v18.0, 2008–2025). For four technologies (solar PV, onshore wind, nuclear, offshore wind), NREL Annual Technology Baseline (2019–2024) projection lines are overlaid.
-
-No API key required.
 
 ```bash
 python price_chart2.py
@@ -120,5 +113,3 @@ Multi-year LCOE projections from 6 ATB vintages (2019–2024), Moderate scenario
 **Nuclear fuel price projections available only from AEO 2017 onward.** Bulk ZIP files for AEO 2008–2013 return 404; AEO 2014–2016 ZIPs do not contain the nuclear fuel price series.
 
 **Each vintage projection line starts at its publication year.** Historical data included in each AEO publication is excluded from the projection lines; only forward-looking values are plotted.
-
-**IRA inflection in recent AEO editions.** The Inflation Reduction Act (2022) clean energy incentives are more fully incorporated in AEO 2023 and later, driving sharp revisions in renewable and fossil fuel projections.
